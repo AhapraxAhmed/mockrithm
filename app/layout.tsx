@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import AuthLayout from "@/components/Authlayout";
 import FooterWrapper from "@/components/shared/FooterWrapper";
 import { getCurrentUser } from "@/lib/actions/auth.action";
+import { Analytics } from "@vercel/analytics/next"
 
 import "./globals.css";
 
@@ -30,6 +31,7 @@ export default async function RootLayout({
       <body
         className={`${monaSans.className} bg-black text-white antialiased pattern`}
       >
+        <Analytics />
         <AuthLayout initialUserId={user?.id} initialUserName={user?.name}>
           {children}
         </AuthLayout>
