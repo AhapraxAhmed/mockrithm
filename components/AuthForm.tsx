@@ -16,7 +16,7 @@ import {
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { signIn, signUp, checkRateLimit, recordLoginAttempt, checkEmailExists } from "@/lib/actions/auth.action";
 import FormField from "./FormField";
@@ -202,8 +202,15 @@ const AuthForm = ({ type }: { type: FormType }) => {
       Forgot Password?
     </Link>
   </div>
-)}            <Button className="btn" type="submit">
-              {isSignIn ? "Sign In" : "Create an Account"}
+)}            <Button className="btn" type="submit" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="animate-spin h-5 w-5" />
+                  {isSignIn ? "Signing In..." : "Creating Account..."}
+                </div>
+              ) : (
+                isSignIn ? "Sign In" : "Create an Account"
+              )}
             </Button>
           </form>
         </Form>

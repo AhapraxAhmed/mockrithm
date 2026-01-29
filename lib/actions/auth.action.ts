@@ -4,7 +4,7 @@ import { db, auth } from "@/firebase/admin";
 import { cookies, headers } from "next/headers";
 
 const MAX_ATTEMPTS = 4;
-const BAN_DURATION = 5 * 60 * 1000; // 5 minutes in ms
+const BAN_DURATION = 6 * 60 * 1000; // 5 minutes in ms
 
 async function getIp() {
   const headersList = await headers();

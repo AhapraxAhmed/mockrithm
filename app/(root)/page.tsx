@@ -7,6 +7,8 @@ import InterviewCard from "@/components/InterviewCard";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 import { trackSession } from "@/lib/actions/session.action";
 
+import SessionTracker from "@/components/SessionTracker";
+
 import {
   getInterviewsByUserId,
   getLatestInterviews,
@@ -23,11 +25,9 @@ async function Home() {
   const hasPastInterviews = Array.isArray(userInterviews) && userInterviews.length > 0;
   const hasUpcomingInterviews = Array.isArray(allInterview) && allInterview.length > 0;
 
-    await trackSession(user?.id || null);
-
-
   return (
     <>
+      <SessionTracker userId={user?.id || null} />
       <section className="card-cta">
         <div className="flex flex-col gap-6 max-w-lg">
           <h2>Get Interview-Ready with AI-Powered Practice & Feedback</h2>

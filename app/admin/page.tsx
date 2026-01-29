@@ -31,16 +31,14 @@ import {
   Activity,
   TrendingUp,
 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
-import { auth, db } from "@/firebase/client";
+import { auth } from "@/firebase/client";
 import { onAuthStateChanged } from "firebase/auth";
+import { getAdminMetrics, getRecentActivity, resetSessions } from "@/lib/actions/admin.action";
+import { toast } from "sonner";
 
 gsap.registerPlugin(ScrollTrigger);
 
-export async function getTotalSessions() {
-  const snapshot = await getDocs(collection(db, "sessions"));
-  return snapshot.size;
-}
+
 
 type User = {
   id: string;
@@ -71,6 +69,9 @@ export default function AdminDashboard() {
   const [userCount, setUserCount] = useState(0);
   const [feedbackCount, setFeedbackCount] = useState(0);
   const [sessionCount, setSessionCount] = useState(0);
+  const [userGrowth, setUserGrowth] = useState("0");
+  const [feedbackGrowth, setFeedbackGrowth] = useState("0");
+  const [sessionGrowth, setSessionGrowth] = useState("0");
   const [recentUsers, setRecentUsers] = useState<User[]>([]);
   const [recentFeedbacks, setRecentFeedbacks] = useState<Feedback[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "user" | "feedback">(
@@ -104,9 +105,11 @@ export default function AdminDashboard() {
       type: "feedback" as const,
     }));
     return [...userActivities, ...feedbackActivities].sort(
-      (a, b) =>
-        (b.createdAt?.toDate?.().getTime() || 0) -
-        (a.createdAt?.toDate?.().getTime() || 0)
+      (a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime() || 0;
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime() || 0;
+        return dateB - dateA;
+      }
     );
   }, [recentUsers, recentFeedbacks, isDataLoaded]);
 
@@ -130,22 +133,22 @@ export default function AdminDashboard() {
 
   const metrics = useMemo(
     () => [
-      { title: "Total Users", value: userCount, change: "+12%", icon: Users },
+      { title: "Total Users", value: userCount, change: `${userGrowth}%`, icon: Users },
       {
         title: "Total Feedbacks",
         value: feedbackCount,
-        change: "+8%",
+        change: `${feedbackGrowth}%`,
         icon: MessageSquare,
       },
       {
         title: "Total Sessions",
         value: sessionCount,
-        change: "+5%",
+        change: `${sessionGrowth}%`,
         icon: Activity,
       },
       { title: "Growth Rate", value: "12%", change: "+5%", icon: TrendingUp },
     ],
-    [userCount, feedbackCount, sessionCount]
+    [userCount, feedbackCount, sessionCount, userGrowth, feedbackGrowth, sessionGrowth]
   );
 
   const handleExportJSON = useCallback(() => {
@@ -164,6 +167,19 @@ export default function AdminDashboard() {
   const handleRefresh = useCallback(() => {
     window.location.reload();
   }, []);
+
+  const handleResetSessions = useCallback(async () => {
+    if (!confirm("Are you sure you want to delete ALL session data? This cannot be undone.")) return;
+    
+    try {
+      const res = await resetSessions();
+      toast.success("Sessions reset successfully!");
+      handleRefresh();
+    } catch (err) {
+      console.error("Reset failed:", err);
+      toast.error("Failed to reset sessions.");
+    }
+  }, [handleRefresh]);
 
   const initializeAnimations = useCallback(() => {
     animationContextRef.current?.revert();
@@ -305,38 +321,27 @@ export default function AdminDashboard() {
     let isMounted = true;
     const fetchData = async () => {
       try {
-        const [usersSnap, feedbackSnap, sessionsSnap] = await Promise.all([
-          getDocs(collection(db, "users")),
-          getDocs(collection(db, "interviewsfeedback")),
-          getDocs(collection(db, "sessions")),
+        const [metricsRes, activityRes] = await Promise.all([
+          getAdminMetrics(),
+          getRecentActivity(),
         ]);
 
         if (!isMounted) return;
 
-        setUserCount(usersSnap.size);
-        setFeedbackCount(feedbackSnap.size);
-        setSessionCount(sessionsSnap.size);
+        if (metricsRes.success && metricsRes.data) {
+          setUserCount(metricsRes.data.users.total);
+          setFeedbackCount(metricsRes.data.feedbacks.total);
+          setSessionCount(metricsRes.data.sessions.total);
+          setUserGrowth(metricsRes.data.users.change);
+          setFeedbackGrowth(metricsRes.data.feedbacks.change);
+          setSessionGrowth(metricsRes.data.sessions.change);
+        }
 
-        const allUsers = usersSnap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() } as User)
-        );
-        const allFeedbacks = feedbackSnap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() } as Feedback)
-        );
+        if (activityRes.success && activityRes.data) {
+          setRecentUsers(activityRes.data.recentUsers as User[]);
+          setRecentFeedbacks(activityRes.data.recentFeedbacks as Feedback[]);
+        }
 
-        allUsers.sort(
-          (a, b) =>
-            (b.createdAt?.toDate?.().getTime() || 0) -
-            (a.createdAt?.toDate?.().getTime() || 0)
-        );
-        allFeedbacks.sort(
-          (a, b) =>
-            (b.createdAt?.toDate?.().getTime() || 0) -
-            (a.createdAt?.toDate?.().getTime() || 0)
-        );
-
-        setRecentUsers(allUsers);
-        setRecentFeedbacks(allFeedbacks);
         setIsDataLoaded(true);
       } catch (err) {
         console.error("Error loading admin data:", err);
@@ -457,6 +462,13 @@ export default function AdminDashboard() {
                   >
                     Refresh
                   </DropdownMenuItem>
+                  <Separator className="bg-white/10 my-1" />
+                  <DropdownMenuItem
+                    onClick={handleResetSessions}
+                    className="hover:bg-red-500/20 focus:bg-red-500/20 text-red-400"
+                  >
+                    Reset Sessions Analytics
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -552,6 +564,8 @@ export default function AdminDashboard() {
                         <p className="text-xs text-gray-500 tabular-nums">
                           {activity.createdAt?.toDate
                             ? activity.createdAt.toDate().toLocaleString()
+                            : new Date(activity.createdAt).toLocaleString() !== "Invalid Date"
+                            ? new Date(activity.createdAt).toLocaleString()
                             : "Recently"}
                         </p>
                       </div>
